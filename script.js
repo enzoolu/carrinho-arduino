@@ -5,6 +5,8 @@ const SERVICE_UUID = 0xffe0;
 const CHARACTERISTIC_UUID = 0xffe1;
 const DOUBLE_TAP_DELAY = 350;
 
+const COLLISION_COMMANDS = new Set(["W", "Q", "E"]);
+
 const connectBtn = document.getElementById("connectBtn");
 const connectLabel = connectBtn.querySelector(".connect-label");
 const statusText = document.getElementById("status");
@@ -19,25 +21,25 @@ const collisionDot = document.getElementById("collisionDot");
 
 const COMMAND_LABELS = {
   W: "W - Frente",
-  S: "S - Re",
+  S: "S - Ré",
   A: "A - Girar esquerda",
   D: "D - Girar direita",
-  Q: "Q - Frente + esquerda",
-  E: "E - Frente + direita",
-  Z: "Z - Re + esquerda",
-  C: "C - Re + direita",
+  Q: "Q - Frente esquerda",
+  E: "E - Frente direita",
+  Z: "Z - Ré esquerda",
+  C: "C - Ré direita",
   0: "0 - Parar",
 };
 
 const COMMAND_VISUALS = {
   W: { label: "Frente", dx: 0, dy: -1, rotation: 0 },
-  S: { label: "Re", dx: 0, dy: 1, rotation: 180 },
-  A: { label: "Esquerda", dx: -1, dy: 0, rotation: -90 },
-  D: { label: "Direita", dx: 1, dy: 0, rotation: 90 },
-  Q: { label: "Frente Esq", dx: -1, dy: -1, rotation: -45 },
-  E: { label: "Frente Dir", dx: 1, dy: -1, rotation: 45 },
-  Z: { label: "Re Esq", dx: -1, dy: 1, rotation: -135 },
-  C: { label: "Re Dir", dx: 1, dy: 1, rotation: 135 },
+  S: { label: "Ré", dx: 0, dy: 1, rotation: 180 },
+  A: { label: "Girar esquerda", dx: -1, dy: 0, rotation: -90 },
+  D: { label: "Girar direita", dx: 1, dy: 0, rotation: 90 },
+  Q: { label: "Frente esquerda", dx: -1, dy: -1, rotation: -45 },
+  E: { label: "Frente direita", dx: 1, dy: -1, rotation: 45 },
+  Z: { label: "Ré esquerda", dx: -1, dy: 1, rotation: -135 },
+  C: { label: "Ré direita", dx: 1, dy: 1, rotation: 135 },
   0: { label: "Parado", dx: 0, dy: 0, rotation: 0 },
 };
 
@@ -50,11 +52,14 @@ let lastSentCommand = "";
 let visualCommand = "0";
 let cartPosition = { x: 0, y: 0 };
 let lastAnimationTime = null;
+let bluetoothBuffer = "";
 
 connectBtn.addEventListener("click", connectBluetooth);
 
 function setConnectLabel(text) {
-  connectLabel.textContent = text;
+  if (connectLabel) {
+    connectLabel.textContent = text;
+  }
 }
 
 async function connectBluetooth() {
@@ -73,6 +78,15 @@ async function connectBluetooth() {
 
     bluetoothCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
 
+    if (bluetoothCharacteristic.properties.notify) {
+      await bluetoothCharacteristic.startNotifications();
+
+      bluetoothCharacteristic.addEventListener(
+        "characteristicvaluechanged",
+        handleBluetoothMessage
+      );
+    }
+
     statusText.textContent = `Status: conectado em ${bluetoothDevice.name || "HC-08"}`;
     setConnectLabel("Bluetooth conectado");
     connectBtn.disabled = true;
@@ -89,69 +103,89 @@ function onDisconnected() {
   deactivateContinuousMode();
   activeManualInputs.clear();
   lastSentCommand = "";
+  bluetoothBuffer = "";
+
   if (lastCommandText) {
-    lastCommandText.textContent = "Ultimo comando: nenhum";
+    lastCommandText.textContent = "Último comando: nenhum";
   }
+
   statusText.textContent = "Status: desconectado";
+}
+
+function handleBluetoothMessage(event) {
+  const value = event.target.value;
+  const text = new TextDecoder().decode(value);
+
+  bluetoothBuffer += text;
+
+  const lines = bluetoothBuffer.split(/\r?\n/);
+  bluetoothBuffer = lines.pop() || "";
+
+  lines.forEach((line) => {
+    processArduinoLine(line.trim());
+  });
+}
+
+function processArduinoLine(line) {
+  if (!line) {
+    return;
+  }
+
+  const distanceMatch = line.match(/DIST:(\d+)/);
+  const collisionMatch = line.match(/COLLISION:([01])/);
+
+  if (distanceMatch) {
+    const distance = Number(distanceMatch[1]);
+
+    if (collisionStatus && !collisionMatch) {
+      setCollisionDetected(distance < 10);
+    }
+  }
+
+  if (collisionMatch) {
+    const isDetected = collisionMatch[1] === "1";
+    setCollisionDetected(isDetected);
+
+    if (isDetected && activeContinuous && COLLISION_COMMANDS.has(activeContinuous.commandCode)) {
+      handleStopAction(false);
+    }
+  }
 }
 
 function getButtonCommandCode(button) {
   if (button.dataset.code) {
-    return button.dataset.code;
+    return button.dataset.code.trim().toUpperCase();
   }
 
   if (button.dataset.command) {
-    return button.dataset.command;
+    return button.dataset.command.trim().toUpperCase();
   }
 
   return button.textContent.trim().toUpperCase();
 }
 
-function getLogicalCommands(button) {
-  const combo = button.dataset.combo;
+function getCurrentManualCommand() {
+  const values = Array.from(activeManualInputs.values());
 
-  if (combo) {
-    return combo.split(",").map((value) => value.trim().toUpperCase());
+  if (values.length === 0) {
+    return null;
   }
 
-  return button.dataset.command ? [button.dataset.command] : [];
-}
-
-function buildBaseCommandSet() {
-  const baseCommands = new Set();
-
-  activeManualInputs.forEach((commands) => {
-    commands.forEach((command) => baseCommands.add(command));
-  });
-
-  if (baseCommands.size === 0 && activeContinuous) {
-    activeContinuous.commands.forEach((command) => baseCommands.add(command));
-  }
-
-  return baseCommands;
-}
-
-function resolveCommandFromSet(commandSet) {
-  const w = commandSet.has("S");
-  const a = commandSet.has("A");
-  const s = commandSet.has("W");
-  const d = commandSet.has("D");
-
-  if (w && a) return "Q";
-  if (w && d) return "E";
-  if (s && a) return "Z";
-  if (s && d) return "C";
-
-  if (w) return "W";
-  if (s) return "S";
-  if (a) return "A";
-  if (d) return "D";
-
-  return "0";
+  return values[values.length - 1];
 }
 
 function getResolvedCommand() {
-  return resolveCommandFromSet(buildBaseCommandSet());
+  const manualCommand = getCurrentManualCommand();
+
+  if (manualCommand) {
+    return manualCommand;
+  }
+
+  if (activeContinuous) {
+    return activeContinuous.commandCode;
+  }
+
+  return "0";
 }
 
 function updateContinuousModeText() {
@@ -160,7 +194,7 @@ function updateContinuousModeText() {
     : "nenhum";
 
   if (continuousModeText) {
-    continuousModeText.textContent = `Modo continuo: ${label}`;
+    continuousModeText.textContent = `Modo contínuo: ${label}`;
   }
 }
 
@@ -172,6 +206,19 @@ function updateContinuousButtonHighlight() {
   if (activeContinuous?.button) {
     activeContinuous.button.classList.add("continuous-active");
   }
+}
+
+function setButtonPressed(button, isPressed) {
+  button.classList.toggle("is-pressed", isPressed);
+  button.setAttribute("aria-pressed", String(isPressed));
+}
+
+function setKeyboardButtonPressed(command, isPressed) {
+  controlButtons.forEach((button) => {
+    if (getButtonCommandCode(button) === command) {
+      setButtonPressed(button, isPressed);
+    }
+  });
 }
 
 function setActiveControl(command) {
@@ -189,12 +236,23 @@ function setCartVisualCommand(command) {
   visualCommand = command;
   document.body.dataset.command = command;
   document.body.dataset.motion = command === "0" ? "idle" : "moving";
-  motionLabel.textContent = visual.label;
-  cart.style.setProperty("--cart-rotate", `${visual.rotation}deg`);
+
+  if (motionLabel) {
+    motionLabel.textContent = visual.label;
+  }
+
+  if (cart) {
+    cart.style.setProperty("--cart-rotate", `${visual.rotation}deg`);
+  }
+
   setActiveControl(command);
 }
 
 function getMovementDistance() {
+  if (!cartStage) {
+    return 36;
+  }
+
   const stageRect = cartStage.getBoundingClientRect();
   const shortestSide = Math.min(stageRect.width, stageRect.height);
 
@@ -212,6 +270,10 @@ function getCartTarget() {
 }
 
 function renderCartPosition() {
+  if (!cart) {
+    return;
+  }
+
   cart.style.setProperty("--cart-x", `${cartPosition.x}px`);
   cart.style.setProperty("--cart-y", `${cartPosition.y}px`);
 }
@@ -251,10 +313,10 @@ function deactivateContinuousMode() {
 
 function activateContinuousMode(button) {
   activeManualInputs.clear();
+
   activeContinuous = {
     button,
     commandCode: getButtonCommandCode(button),
-    commands: getLogicalCommands(button),
   };
 
   updateContinuousModeText();
@@ -279,7 +341,7 @@ async function sendCommand(command) {
   const commandLabel = COMMAND_LABELS[command] || command;
 
   if (lastCommandText) {
-    lastCommandText.textContent = `Ultimo comando: ${commandLabel}`;
+    lastCommandText.textContent = `Último comando: ${commandLabel}`;
   }
 
   if (!bluetoothCharacteristic) {
@@ -314,6 +376,7 @@ function setCollisionDetected(isDetected) {
   collisionStatus.textContent = isDetected
     ? "Colisão detectada"
     : "Nenhuma colisão detectada";
+
   collisionDot.classList.toggle("is-detected", isDetected);
 }
 
@@ -327,12 +390,15 @@ function cancelContinuousForManualInput() {
   deactivateContinuousMode();
 }
 
-function handleStopAction() {
+function handleStopAction(sendStopCommand = true) {
   deactivateContinuousMode();
   activeManualInputs.clear();
   setCartVisualCommand("0");
   lastSentCommand = "0";
-  sendCommand("0");
+
+  if (sendStopCommand) {
+    sendCommand("0");
+  }
 }
 
 function isDoubleTap(button) {
@@ -352,11 +418,12 @@ function handlePointerDown(event) {
   const commandCode = getButtonCommandCode(button);
 
   event.preventDefault();
+  setButtonPressed(button, true);
   button.setPointerCapture(event.pointerId);
 
   if (commandCode === "0") {
     ignoredPointerUps.add(event.pointerId);
-    handleStopAction();
+    handleStopAction(true);
     return;
   }
 
@@ -368,7 +435,7 @@ function handlePointerDown(event) {
   }
 
   cancelContinuousForManualInput();
-  activeManualInputs.set(event.pointerId, getLogicalCommands(button));
+  activeManualInputs.set(event.pointerId, commandCode);
   updateMovement();
 }
 
@@ -376,6 +443,7 @@ function handlePointerUp(event) {
   const button = event.currentTarget;
 
   event.preventDefault();
+  setButtonPressed(button, false);
 
   if (ignoredPointerUps.has(event.pointerId)) {
     ignoredPointerUps.delete(event.pointerId);
@@ -388,6 +456,10 @@ function handlePointerUp(event) {
 }
 
 function handlePointerCancel(event) {
+  const button = event.currentTarget;
+
+  setButtonPressed(button, false);
+
   if (ignoredPointerUps.has(event.pointerId)) {
     ignoredPointerUps.delete(event.pointerId);
     return;
@@ -397,30 +469,46 @@ function handlePointerCancel(event) {
   updateMovement();
 }
 
+function handlePointerLostCapture(event) {
+  const button = event.currentTarget;
+
+  setButtonPressed(button, false);
+
+  if (activeManualInputs.delete(event.pointerId)) {
+    updateMovement();
+  }
+}
+
 controlButtons.forEach((button) => {
+  button.setAttribute("aria-pressed", "false");
   button.addEventListener("pointerdown", handlePointerDown);
   button.addEventListener("pointerup", handlePointerUp);
   button.addEventListener("pointercancel", handlePointerCancel);
+  button.addEventListener("lostpointercapture", handlePointerLostCapture);
 });
 
 document.addEventListener("keydown", (event) => {
   const key = event.key.toUpperCase();
+  const allowedKeys = ["W", "A", "S", "D", "Q", "E", "Z", "C"];
 
-  if (["W", "A", "S", "D"].includes(key) && !event.repeat) {
+  if (allowedKeys.includes(key) && !event.repeat) {
     cancelContinuousForManualInput();
-    activeManualInputs.set(`key:${key}`, [key]);
+    setKeyboardButtonPressed(key, true);
+    activeManualInputs.set(`key:${key}`, key);
     updateMovement();
   }
 
   if (event.code === "Space") {
-    handleStopAction();
+    handleStopAction(true);
   }
 });
 
 document.addEventListener("keyup", (event) => {
   const key = event.key.toUpperCase();
+  const allowedKeys = ["W", "A", "S", "D", "Q", "E", "Z", "C"];
 
-  if (["W", "A", "S", "D"].includes(key)) {
+  if (allowedKeys.includes(key)) {
+    setKeyboardButtonPressed(key, false);
     activeManualInputs.delete(`key:${key}`);
     updateMovement();
   }
@@ -428,5 +516,6 @@ document.addEventListener("keyup", (event) => {
 
 updateContinuousModeText();
 setCartVisualCommand("0");
+setCollisionDetected(false);
 renderCartPosition();
 requestAnimationFrame(animateCart);

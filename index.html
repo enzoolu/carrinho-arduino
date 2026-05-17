@@ -3,16 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Controle Carrinho Arduino v4</title>
+  <title>Controle Carrinho Arduino v5</title>
   <link rel="stylesheet" href="style.css" />
 </head>
+
 <body data-motion="idle" data-command="0">
   <main class="app">
     <header class="topbar">
-      <h1>Controle Bluetooth para Arduino</h1>
+      <h1>Controle Bluetooth para Arduino v5</h1>
     </header>
 
-    <section class="connection-bar" aria-label="Estado da conexao e comandos">
+    <section class="connection-bar" aria-label="Estado da conexão e comandos">
       <button id="connectBtn" class="connect-btn" type="button">
         <span class="connect-dot" aria-hidden="true"></span>
         <span class="connect-label">Conectar Bluetooth</span>
@@ -20,10 +21,12 @@
 
       <div class="status-stack">
         <p id="status" class="status">Status: desconectado</p>
+        <p id="lastCommand" class="status">Último comando: nenhum</p>
+        <p id="continuousMode" class="status">Modo contínuo: nenhum</p>
       </div>
     </section>
 
-    <section class="drive-panel" aria-label="Visualizacao do movimento">
+    <section class="drive-panel" aria-label="Visualização do movimento">
       <div class="drive-header">
         <div class="direction-chip">
           <span class="chip-kicker">Direção</span>
@@ -37,11 +40,14 @@
       <div id="cartStage" class="cart-stage" aria-hidden="true">
         <div id="cart" class="cart">
           <div class="cart-shadow"></div>
+
           <div class="cart-body">
             <div class="cart-nose"></div>
             <div class="cart-cabin"></div>
+
             <span class="cart-light cart-light-left"></span>
             <span class="cart-light cart-light-right"></span>
+
             <span class="wheel wheel-front-left"></span>
             <span class="wheel wheel-front-right"></span>
             <span class="wheel wheel-back-left"></span>
@@ -53,7 +59,7 @@
 
     <section class="control-shell" aria-label="Controles direcionais">
       <div class="controls">
-        <button class="control-btn combo" data-code="Q" data-combo="W,A" type="button" aria-label="Frente esquerda">
+        <button class="control-btn combo" data-code="Q" data-command="Q" type="button" aria-label="Frente esquerda">
           <span class="btn-icon" aria-hidden="true">&nwarr;</span>
           <span class="btn-label">Frente Esq</span>
         </button>
@@ -63,7 +69,7 @@
           <span class="btn-label">Frente</span>
         </button>
 
-        <button class="control-btn combo" data-code="E" data-combo="W,D" type="button" aria-label="Frente direita">
+        <button class="control-btn combo" data-code="E" data-command="E" type="button" aria-label="Frente direita">
           <span class="btn-icon" aria-hidden="true">&nearr;</span>
           <span class="btn-label">Frente Dir</span>
         </button>
@@ -83,25 +89,24 @@
           <span class="btn-label">Direita</span>
         </button>
 
-        <button class="control-btn combo" data-code="Z" data-combo="S,A" type="button" aria-label="Re esquerda">
+        <button class="control-btn combo" data-code="Z" data-command="Z" type="button" aria-label="Ré esquerda">
           <span class="btn-icon" aria-hidden="true">&swarr;</span>
-          <span class="btn-label">Re Esq</span>
+          <span class="btn-label">Ré Esq</span>
         </button>
 
-        <button class="control-btn backward" data-code="S" data-command="S" type="button" aria-label="Re">
+        <button class="control-btn backward" data-code="S" data-command="S" type="button" aria-label="Ré">
           <span class="btn-icon" aria-hidden="true">&darr;</span>
-          <span class="btn-label">Re</span>
+          <span class="btn-label">Ré</span>
         </button>
 
-        <button class="control-btn combo" data-code="C" data-combo="S,D" type="button" aria-label="Re direita">
+        <button class="control-btn combo" data-code="C" data-command="C" type="button" aria-label="Ré direita">
           <span class="btn-icon" aria-hidden="true">&searr;</span>
-          <span class="btn-label">Re Dir</span>
+          <span class="btn-label">Ré Dir</span>
         </button>
       </div>
-
     </section>
 
-    <section class="collision-card" aria-label="Estado de colisao">
+    <section class="collision-card" aria-label="Estado de colisão">
       <span id="collisionDot" class="collision-dot" aria-hidden="true"></span>
       <p id="collisionStatus">Nenhuma colisão detectada</p>
     </section>
