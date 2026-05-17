@@ -9,6 +9,9 @@ const statusText = document.getElementById("status");
 const lastCommandText = document.getElementById("lastCommand");
 const controlButtons = document.querySelectorAll(".control-btn");
 
+const pressedCommands = new Set();
+let lastSentCommand = "";
+
 connectBtn.addEventListener("click", connectBluetooth);
 
 async function connectBluetooth() {
@@ -16,8 +19,8 @@ async function connectBluetooth() {
     statusText.textContent = "Status: procurando HC-08...";
 
     bluetoothDevice = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: [SERVICE_UUID]
+      acceptAllDevices: true,
+      optionalServices: [SERVICE_UUID],
     });
 
     bluetoothDevice.addEventListener("gattserverdisconnected", onDisconnected);
@@ -27,10 +30,9 @@ async function connectBluetooth() {
 
     bluetoothCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
 
-    statusText.textContent = `Status: conectado em ${bluetoothDevice.name}`;
+    statusText.textContent = `Status: conectado em ${bluetoothDevice.name || "HC-08"}`;
     connectBtn.textContent = "Bluetooth conectado";
     connectBtn.disabled = true;
-
   } catch (error) {
     console.error(error);
     statusText.textContent = "Status: erro ao conectar";
@@ -42,6 +44,36 @@ function onDisconnected() {
   statusText.textContent = "Status: desconectado";
   connectBtn.textContent = "Conectar Bluetooth";
   connectBtn.disabled = false;
+}
+
+function resolveCommand() {
+  const w = pressedCommands.has("W");
+  const a = pressedCommands.has("A");
+  const s = pressedCommands.has("S");
+  const d = pressedCommands.has("D");
+
+  if (w && a) return "Q"; // frente + esquerda
+  if (w && d) return "E"; // frente + direita
+  if (s && a) return "Z"; // ré + esquerda
+  if (s && d) return "C"; // ré + direita
+
+  if (w) return "W";
+  if (s) return "S";
+  if (a) return "A";
+  if (d) return "D";
+
+  return "0";
+}
+
+async function updateMovement() {
+  const command = resolveCommand();
+
+  if (command === lastSentCommand) {
+    return;
+  }
+
+  lastSentCommand = command;
+  await sendCommand(command);
 }
 
 async function sendCommand(command) {
@@ -76,36 +108,50 @@ controlButtons.forEach((button) => {
 
   button.addEventListener("touchstart", (event) => {
     event.preventDefault();
-    sendCommand(command);
+
+    if (command === "0") {
+      pressedCommands.clear();
+      sendCommand("0");
+      lastSentCommand = "0";
+      return;
+    }
+
+    pressedCommands.add(command);
+    updateMovement();
   });
 
   button.addEventListener("touchend", (event) => {
     event.preventDefault();
 
     if (command !== "0") {
-      sendCommand("0");
+      pressedCommands.delete(command);
+      updateMovement();
     }
   });
 
   button.addEventListener("mousedown", () => {
-    sendCommand(command);
+    if (command === "0") {
+      pressedCommands.clear();
+      sendCommand("0");
+      lastSentCommand = "0";
+      return;
+    }
+
+    pressedCommands.add(command);
+    updateMovement();
   });
 
   button.addEventListener("mouseup", () => {
     if (command !== "0") {
-      sendCommand("0");
+      pressedCommands.delete(command);
+      updateMovement();
     }
   });
 
   button.addEventListener("mouseleave", () => {
     if (command !== "0") {
-      sendCommand("0");
-    }
-  });
-
-  button.addEventListener("click", () => {
-    if (command === "0") {
-      sendCommand("0");
+      pressedCommands.delete(command);
+      updateMovement();
     }
   });
 });
@@ -114,11 +160,14 @@ document.addEventListener("keydown", (event) => {
   const key = event.key.toUpperCase();
 
   if (["W", "A", "S", "D"].includes(key)) {
-    sendCommand(key);
+    pressedCommands.add(key);
+    updateMovement();
   }
 
   if (event.code === "Space") {
+    pressedCommands.clear();
     sendCommand("0");
+    lastSentCommand = "0";
   }
 });
 
@@ -126,6 +175,7 @@ document.addEventListener("keyup", (event) => {
   const key = event.key.toUpperCase();
 
   if (["W", "A", "S", "D"].includes(key)) {
-    sendCommand("0");
+    pressedCommands.delete(key);
+    updateMovement();
   }
 });
