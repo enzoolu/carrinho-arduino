@@ -132,9 +132,9 @@ function buildBaseCommandSet() {
 }
 
 function resolveCommandFromSet(commandSet) {
-  const w = commandSet.has("W");
+  const w = commandSet.has("S");
   const a = commandSet.has("A");
-  const s = commandSet.has("S");
+  const s = commandSet.has("W");
   const d = commandSet.has("D");
 
   if (w && a) return "Q";
