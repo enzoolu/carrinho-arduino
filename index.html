@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Controle Carrinho Arduino</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <h1>Controle do Carrinho</h1>
+
+    <section class="card">
+      <button id="connectBtn" class="connect-btn">
+        Conectar Bluetooth
+      </button>
+
+      <p id="status" class="status">Status: desconectado</p>
+      <p id="lastCommand" class="last-command">Último comando: nenhum</p>
+    </section>
+
+    <section class="controls">
+      <button class="control-btn forward" data-command="W">W</button>
+
+      <div class="middle-row">
+        <button class="control-btn" data-command="A">A</button>
+        <button class="control-btn stop" data-command="0">STOP</button>
+        <button class="control-btn" data-command="D">D</button>
+      </div>
+
+      <button class="control-btn backward" data-command="S">S</button>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>

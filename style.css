@@ -1,0 +1,109 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  background: #111827;
+  color: white;
+  font-family: Arial, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  touch-action: manipulation;
+}
+
+.app {
+  width: 100%;
+  max-width: 420px;
+  padding: 24px;
+  text-align: center;
+}
+
+h1 {
+  margin-bottom: 24px;
+  font-size: 28px;
+}
+
+.card {
+  background: #1f2937;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 28px;
+}
+
+.connect-btn {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: 12px;
+  background: #22c55e;
+  color: #052e16;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.status,
+.last-command {
+  margin-top: 14px;
+  font-size: 16px;
+  color: #d1d5db;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.middle-row {
+  display: flex;
+  gap: 18px;
+}
+
+.control-btn {
+  width: 95px;
+  height: 95px;
+  border: none;
+  border-radius: 20px;
+  background: #2563eb;
+  color: white;
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+  user-select: none;
+}
+
+.control-btn:active {
+  transform: scale(0.95);
+  background: #1d4ed8;
+}
+
+.stop {
+  background: #dc2626;
+  font-size: 18px;
+}
+
+.stop:active {
+  background: #b91c1c;
+}
+
+.forward,
+.backward {
+  background: #374151;
+}
+
+@media (max-width: 380px) {
+  .control-btn {
+    width: 82px;
+    height: 82px;
+  }
+
+  .middle-row {
+    gap: 12px;
+  }
+}
