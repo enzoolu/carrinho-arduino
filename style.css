@@ -47,10 +47,16 @@ h1 {
 }
 
 .status,
-.last-command {
+.last-command,
+.continuous-mode {
   margin-top: 14px;
   font-size: 16px;
   color: #d1d5db;
+}
+
+.continuous-mode {
+  color: #fcd34d;
+  font-weight: bold;
 }
 
 .controls {
@@ -73,6 +79,7 @@ h1 {
   font-weight: bold;
   cursor: pointer;
   user-select: none;
+  touch-action: manipulation;
 }
 
 .control-btn:active {
@@ -103,6 +110,16 @@ h1 {
   background: #0d5f59;
 }
 
+.continuous-active {
+  background: #f59e0b;
+  color: #111827;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.25);
+}
+
+.continuous-active:active {
+  background: #d97706;
+}
+
 .combined-commands {
   background: #1f2937;
   border-radius: 16px;
@@ -130,6 +147,7 @@ h1 {
 .combined-commands p {
   color: #93c5fd;
   font-size: 14px;
+  margin-top: 8px;
 }
 
 @media (max-width: 380px) {
