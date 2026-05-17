@@ -11,6 +11,17 @@ const controlButtons = document.querySelectorAll(".control-btn");
 
 const pressedCommands = new Set();
 let lastSentCommand = "";
+const COMMAND_LABELS = {
+  W: "W - Frente",
+  S: "S - Ré",
+  A: "A - Girar esquerda",
+  D: "D - Girar direita",
+  Q: "Q - Frente + esquerda",
+  E: "E - Frente + direita",
+  Z: "Z - Ré + esquerda",
+  C: "C - Ré + direita",
+  0: "0 - Parar",
+};
 
 connectBtn.addEventListener("click", connectBluetooth);
 
@@ -96,63 +107,71 @@ async function sendCommand(command) {
       await bluetoothCharacteristic.writeValue(data);
     }
 
-    lastCommandText.textContent = `Último comando: ${command}`;
+    const commandLabel = COMMAND_LABELS[command] || command;
+    lastCommandText.textContent = `Último comando: ${commandLabel}`;
   } catch (error) {
     console.error(error);
     statusText.textContent = "Status: erro ao enviar comando";
   }
 }
 
-controlButtons.forEach((button) => {
-  const command = button.dataset.command;
+function getLogicalCommands(button) {
+  const combo = button.dataset.combo;
 
+  if (combo) {
+    return combo.split(",").map((value) => value.trim().toUpperCase());
+  }
+
+  const command = button.dataset.command;
+  return command ? [command] : [];
+}
+
+function pressButton(button) {
+  const commands = getLogicalCommands(button);
+
+  if (commands.includes("0")) {
+    pressedCommands.clear();
+    sendCommand("0");
+    lastSentCommand = "0";
+    return;
+  }
+
+  commands.forEach((command) => pressedCommands.add(command));
+  updateMovement();
+}
+
+function releaseButton(button) {
+  const commands = getLogicalCommands(button);
+
+  if (commands.includes("0")) {
+    return;
+  }
+
+  commands.forEach((command) => pressedCommands.delete(command));
+  updateMovement();
+}
+
+controlButtons.forEach((button) => {
   button.addEventListener("touchstart", (event) => {
     event.preventDefault();
-
-    if (command === "0") {
-      pressedCommands.clear();
-      sendCommand("0");
-      lastSentCommand = "0";
-      return;
-    }
-
-    pressedCommands.add(command);
-    updateMovement();
+    pressButton(button);
   });
 
   button.addEventListener("touchend", (event) => {
     event.preventDefault();
-
-    if (command !== "0") {
-      pressedCommands.delete(command);
-      updateMovement();
-    }
+    releaseButton(button);
   });
 
   button.addEventListener("mousedown", () => {
-    if (command === "0") {
-      pressedCommands.clear();
-      sendCommand("0");
-      lastSentCommand = "0";
-      return;
-    }
-
-    pressedCommands.add(command);
-    updateMovement();
+    pressButton(button);
   });
 
   button.addEventListener("mouseup", () => {
-    if (command !== "0") {
-      pressedCommands.delete(command);
-      updateMovement();
-    }
+    releaseButton(button);
   });
 
   button.addEventListener("mouseleave", () => {
-    if (command !== "0") {
-      pressedCommands.delete(command);
-      updateMovement();
-    }
+    releaseButton(button);
   });
 });
 

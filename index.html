@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Controle Carrinho Arduino</title>
+  <title>Controle Carrinho Arduino v3</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="app">
-    <h1>Controle do Carrinho</h1>
+    <h1>Controle do Carrinho v3</h1>
 
     <section class="card">
       <button id="connectBtn" class="connect-btn">
@@ -20,15 +20,28 @@
     </section>
 
     <section class="controls">
+      <button class="control-btn combo" data-combo="W,A">Q</button>
       <button class="control-btn forward" data-command="W">W</button>
+      <button class="control-btn combo" data-combo="W,D">E</button>
 
-      <div class="middle-row">
-        <button class="control-btn" data-command="A">A</button>
-        <button class="control-btn stop" data-command="0">STOP</button>
-        <button class="control-btn" data-command="D">D</button>
-      </div>
+      <button class="control-btn left" data-command="A">A</button>
+      <button class="control-btn stop" data-command="0">STOP</button>
+      <button class="control-btn right" data-command="D">D</button>
 
+      <button class="control-btn combo" data-combo="S,A">Z</button>
       <button class="control-btn backward" data-command="S">S</button>
+      <button class="control-btn combo" data-combo="S,D">C</button>
+    </section>
+
+    <section class="combined-commands">
+      <h2>Comandos combinados</h2>
+      <ul>
+        <li>W + A = Curva para frente à esquerda</li>
+        <li>W + D = Curva para frente à direita</li>
+        <li>S + A = Ré virando à esquerda</li>
+        <li>S + D = Ré virando à direita</li>
+      </ul>
+      <p>Segure dois botões ao mesmo tempo para ativar uma curva.</p>
     </section>
   </main>
 
