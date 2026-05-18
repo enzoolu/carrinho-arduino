@@ -90,26 +90,37 @@ async function connectBluetooth() {
 
     bluetoothDevice.addEventListener("gattserverdisconnected", onDisconnected);
 
+    statusText.textContent = "Status: conectando ao HC-08...";
+
     const server = await bluetoothDevice.gatt.connect();
     const service = await server.getPrimaryService(SERVICE_UUID);
 
     bluetoothCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
 
-    if (bluetoothCharacteristic.properties.notify) {
-      await bluetoothCharacteristic.startNotifications();
-
-      bluetoothCharacteristic.addEventListener(
-        "characteristicvaluechanged",
-        handleBluetoothMessage
-      );
-    }
-
     statusText.textContent = `Status: conectado em ${bluetoothDevice.name || "HC-08"}`;
     setConnectLabel("Bluetooth conectado");
     connectBtn.disabled = true;
+
+    // Notificação é opcional.
+    // Se falhar, o controle continua funcionando.
+    if (bluetoothCharacteristic.properties.notify) {
+      try {
+        await bluetoothCharacteristic.startNotifications();
+
+        bluetoothCharacteristic.addEventListener(
+          "characteristicvaluechanged",
+          handleBluetoothMessage
+        );
+
+        console.log("Notificações BLE ativadas.");
+      } catch (notifyError) {
+        console.warn("Conectou, mas não conseguiu ativar notificações:", notifyError);
+        statusText.textContent = `Status: conectado em ${bluetoothDevice.name || "HC-08"} sem leitura de colisão`;
+      }
+    }
   } catch (error) {
     console.error(error);
-    statusText.textContent = "Status: erro ao conectar";
+    statusText.textContent = `Status: erro ao conectar - ${error.message}`;
   }
 }
 
