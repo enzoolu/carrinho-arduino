@@ -11,7 +11,6 @@ const GAMEPAD_DEADZONE = 0.45;
 const connectBtn = document.getElementById("connectBtn");
 const connectLabel = connectBtn?.querySelector(".connect-label");
 const statusText = document.getElementById("status");
-const lastCommandText = document.getElementById("lastCommand");
 const continuousModeText = document.getElementById("continuousMode");
 const controlButtons = document.querySelectorAll(".control-btn");
 const cartStage = document.getElementById("cartStage");
@@ -21,17 +20,21 @@ const collisionStatus = document.getElementById("collisionStatus");
 const collisionDot = document.getElementById("collisionDot");
 
 let gamepadStatusText = document.getElementById("gamepadStatus");
+document.getElementById("lastCommand")?.remove();
 
 if (!gamepadStatusText) {
   gamepadStatusText = document.createElement("p");
   gamepadStatusText.id = "gamepadStatus";
   gamepadStatusText.className = "status";
-  gamepadStatusText.textContent = "Controle PS5: aguardando";
 
   const statusStack = document.querySelector(".status-stack");
   if (statusStack) {
     statusStack.appendChild(gamepadStatusText);
   }
+}
+
+if (gamepadStatusText) {
+  gamepadStatusText.hidden = true;
 }
 
 const COMMAND_LABELS = {
@@ -132,10 +135,6 @@ function onDisconnected() {
   activeManualInputs.clear();
   lastSentCommand = "";
   bluetoothBuffer = "";
-
-  if (lastCommandText) {
-    lastCommandText.textContent = "Último comando: nenhum";
-  }
 
   statusText.textContent = "Status: desconectado";
 }
@@ -369,12 +368,6 @@ async function updateMovement(force = false) {
 }
 
 async function sendCommand(command) {
-  const commandLabel = COMMAND_LABELS[command] || command;
-
-  if (lastCommandText) {
-    lastCommandText.textContent = `Último comando: ${commandLabel}`;
-  }
-
   if (!bluetoothCharacteristic) {
     statusText.textContent = "Status: conecte o Bluetooth primeiro";
     return;
@@ -549,6 +542,12 @@ document.addEventListener("keyup", (event) => {
 
 function setGamepadStatus(text) {
   if (gamepadStatusText) {
+    if (lastGamepadIndex === null && !getFirstConnectedGamepad()) {
+      gamepadStatusText.hidden = true;
+      return;
+    }
+
+    gamepadStatusText.hidden = false;
     gamepadStatusText.textContent = text;
   }
 }
@@ -628,7 +627,7 @@ function updateGamepadControl() {
     if (lastGamepadIndex !== null) {
       lastGamepadIndex = null;
       gamepadCommand = "0";
-      setGamepadStatus("Controle PS5: desconectado");
+      gamepadStatusText.hidden = true;
       updateMovement();
     }
 
@@ -669,7 +668,7 @@ window.addEventListener("gamepadconnected", (event) => {
 window.addEventListener("gamepaddisconnected", () => {
   lastGamepadIndex = null;
   gamepadCommand = "0";
-  setGamepadStatus("Controle PS5: desconectado");
+  gamepadStatusText.hidden = true;
   updateMovement();
 });
 
