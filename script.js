@@ -6,9 +6,10 @@ const CHARACTERISTIC_UUID = 0xffe1;
 const DOUBLE_TAP_DELAY = 350;
 
 const COLLISION_COMMANDS = new Set(["W", "Q", "E"]);
+const GAMEPAD_DEADZONE = 0.45;
 
 const connectBtn = document.getElementById("connectBtn");
-const connectLabel = connectBtn.querySelector(".connect-label");
+const connectLabel = connectBtn?.querySelector(".connect-label");
 const statusText = document.getElementById("status");
 const lastCommandText = document.getElementById("lastCommand");
 const continuousModeText = document.getElementById("continuousMode");
@@ -18,6 +19,20 @@ const cart = document.getElementById("cart");
 const motionLabel = document.getElementById("motionLabel");
 const collisionStatus = document.getElementById("collisionStatus");
 const collisionDot = document.getElementById("collisionDot");
+
+let gamepadStatusText = document.getElementById("gamepadStatus");
+
+if (!gamepadStatusText) {
+  gamepadStatusText = document.createElement("p");
+  gamepadStatusText.id = "gamepadStatus";
+  gamepadStatusText.className = "status";
+  gamepadStatusText.textContent = "Controle PS5: aguardando";
+
+  const statusStack = document.querySelector(".status-stack");
+  if (statusStack) {
+    statusStack.appendChild(gamepadStatusText);
+  }
+}
 
 const COMMAND_LABELS = {
   W: "W - Frente",
@@ -53,8 +68,10 @@ let visualCommand = "0";
 let cartPosition = { x: 0, y: 0 };
 let lastAnimationTime = null;
 let bluetoothBuffer = "";
+let gamepadCommand = "0";
+let lastGamepadIndex = null;
 
-connectBtn.addEventListener("click", connectBluetooth);
+connectBtn?.addEventListener("click", connectBluetooth);
 
 function setConnectLabel(text) {
   if (connectLabel) {
@@ -134,31 +151,30 @@ function processArduinoLine(line) {
   const distanceMatch = line.match(/DIST:(\d+)/);
   const collisionMatch = line.match(/COLLISION:([01])/);
 
-  if (distanceMatch) {
-    const distance = Number(distanceMatch[1]);
-
-    if (collisionStatus && !collisionMatch) {
-      setCollisionDetected(distance < 10);
-    }
-  }
-
   if (collisionMatch) {
     const isDetected = collisionMatch[1] === "1";
     setCollisionDetected(isDetected);
 
-    if (isDetected && activeContinuous && COLLISION_COMMANDS.has(activeContinuous.commandCode)) {
+    if (isDetected && COLLISION_COMMANDS.has(lastSentCommand)) {
       handleStopAction(false);
     }
+
+    return;
+  }
+
+  if (distanceMatch) {
+    const distance = Number(distanceMatch[1]);
+    setCollisionDetected(distance < 10);
   }
 }
 
 function getButtonCommandCode(button) {
-  if (button.dataset.code) {
-    return button.dataset.code.trim().toUpperCase();
-  }
-
   if (button.dataset.command) {
     return button.dataset.command.trim().toUpperCase();
+  }
+
+  if (button.dataset.code) {
+    return button.dataset.code.trim().toUpperCase();
   }
 
   return button.textContent.trim().toUpperCase();
@@ -179,6 +195,10 @@ function getResolvedCommand() {
 
   if (manualCommand) {
     return manualCommand;
+  }
+
+  if (gamepadCommand !== "0") {
+    return gamepadCommand;
   }
 
   if (activeContinuous) {
@@ -393,6 +413,8 @@ function cancelContinuousForManualInput() {
 function handleStopAction(sendStopCommand = true) {
   deactivateContinuousMode();
   activeManualInputs.clear();
+  gamepadCommand = "0";
+  setGamepadStatus("Controle PS5: parado");
   setCartVisualCommand("0");
   lastSentCommand = "0";
 
@@ -514,8 +536,135 @@ document.addEventListener("keyup", (event) => {
   }
 });
 
+function setGamepadStatus(text) {
+  if (gamepadStatusText) {
+    gamepadStatusText.textContent = text;
+  }
+}
+
+function getFirstConnectedGamepad() {
+  if (!navigator.getGamepads) {
+    return null;
+  }
+
+  const gamepads = navigator.getGamepads();
+
+  for (const gamepad of gamepads) {
+    if (gamepad && gamepad.connected) {
+      return gamepad;
+    }
+  }
+
+  return null;
+}
+
+function axisToDirection(value) {
+  if (value <= -GAMEPAD_DEADZONE) {
+    return -1;
+  }
+
+  if (value >= GAMEPAD_DEADZONE) {
+    return 1;
+  }
+
+  return 0;
+}
+
+function resolveGamepadCommand(gamepad) {
+  if (!gamepad) {
+    return "0";
+  }
+
+  const leftX = axisToDirection(gamepad.axes[0] || 0);
+  const leftY = axisToDirection(gamepad.axes[1] || 0);
+
+  const dpadUp = gamepad.buttons[12]?.pressed;
+  const dpadDown = gamepad.buttons[13]?.pressed;
+  const dpadLeft = gamepad.buttons[14]?.pressed;
+  const dpadRight = gamepad.buttons[15]?.pressed;
+
+  const stopPressed =
+    gamepad.buttons[0]?.pressed ||
+    gamepad.buttons[1]?.pressed ||
+    gamepad.buttons[2]?.pressed ||
+    gamepad.buttons[3]?.pressed ||
+    gamepad.buttons[9]?.pressed;
+
+  if (stopPressed) {
+    return "0";
+  }
+
+  const x = dpadLeft ? -1 : dpadRight ? 1 : leftX;
+  const y = dpadUp ? -1 : dpadDown ? 1 : leftY;
+
+  if (y === -1 && x === -1) return "Q";
+  if (y === -1 && x === 1) return "E";
+  if (y === 1 && x === -1) return "Z";
+  if (y === 1 && x === 1) return "C";
+
+  if (y === -1) return "W";
+  if (y === 1) return "S";
+  if (x === -1) return "A";
+  if (x === 1) return "D";
+
+  return "0";
+}
+
+function updateGamepadControl() {
+  const gamepad = getFirstConnectedGamepad();
+
+  if (!gamepad) {
+    if (lastGamepadIndex !== null) {
+      lastGamepadIndex = null;
+      gamepadCommand = "0";
+      setGamepadStatus("Controle PS5: desconectado");
+      updateMovement();
+    }
+
+    requestAnimationFrame(updateGamepadControl);
+    return;
+  }
+
+  if (lastGamepadIndex !== gamepad.index) {
+    lastGamepadIndex = gamepad.index;
+    setGamepadStatus(`Controle PS5: conectado`);
+  }
+
+  const newCommand = resolveGamepadCommand(gamepad);
+
+  if (newCommand !== gamepadCommand) {
+    gamepadCommand = newCommand;
+
+    const label = COMMAND_LABELS[gamepadCommand] || gamepadCommand;
+    setGamepadStatus(`Controle PS5: ${label}`);
+
+    if (activeManualInputs.size === 0) {
+      if (gamepadCommand !== "0") {
+        deactivateContinuousMode();
+      }
+
+      updateMovement();
+    }
+  }
+
+  requestAnimationFrame(updateGamepadControl);
+}
+
+window.addEventListener("gamepadconnected", (event) => {
+  lastGamepadIndex = event.gamepad.index;
+  setGamepadStatus("Controle PS5: conectado");
+});
+
+window.addEventListener("gamepaddisconnected", () => {
+  lastGamepadIndex = null;
+  gamepadCommand = "0";
+  setGamepadStatus("Controle PS5: desconectado");
+  updateMovement();
+});
+
 updateContinuousModeText();
 setCartVisualCommand("0");
 setCollisionDetected(false);
 renderCartPosition();
 requestAnimationFrame(animateCart);
+requestAnimationFrame(updateGamepadControl);
